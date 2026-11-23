@@ -135,6 +135,10 @@ type CloudDownloadTask struct {
 	// IngestTitle is the final per-link title captured when the batch was
 	// submitted (title_mode=filename). Empty means the batch title applies.
 	IngestTitle string `json:"ingest_title,omitempty"`
+	// IngestForced records that the admin released this link although its
+	// declared suffix could not be recognised as a video. It is a label, not a
+	// promise: the import stage still probes the real content.
+	IngestForced bool `json:"ingest_forced,omitempty"`
 	// Import is the explicit media-library import summary, when one exists.
 	Import *CloudDownloadImportSummary `json:"import,omitempty"`
 	// FileDeletion is the optional 115 recycle-bin cleanup summary.

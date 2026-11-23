@@ -792,7 +792,10 @@ onUnmounted(() => {
                     :label="ingestMeta(row).label"
                     :tone="ingestMeta(row).tone"
                   />
-                  <span v-else>--</span>
+                  <el-tag v-if="row.ingest_forced" size="small" type="warning" effect="plain">
+                    强制
+                  </el-tag>
+                  <span v-else-if="!ingestMeta(row)">--</span>
                 </template>
               </el-table-column>
               <el-table-column label="来源" min-width="130" show-overflow-tooltip>

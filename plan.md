@@ -1,5 +1,12 @@
 # plan.md
 
+## 2026-11-23 17:19 +0800 云下载批量入库：补齐已知遗留
+- 迁移 `0053`：`cloud_download_tasks.ingest_forced`（NOT NULL DEFAULT false），把「强制放行」从只在响应里出现的标签落到任务行；`AttachTask` 在同一条件更新里写入，列表页据此单行标注「强制」。
+- 管理端：入库弹窗的四类候选（标签/演员/视频合集/图片图集）全部改为远程检索（`remote-method` + `q`/`limit`），不再一次性拉 100 条导致超量选不到；已选项在远端结果里合并保留。
+- 测试：新增「四类候选都走远程检索」与「列表页入库批筛选/入库状态列/强制标记/真实 import」断言；`cloudDownloadList.spec.js` 显式锁住 `resolveIngestStatusMeta` 的 import（漏 import 曾导致运行期崩溃且被 stub 掩盖）。
+- 验证：`go build ./...`、`go vet ./...`；`go test ./internal/services ./internal/handlers ./internal/repository` 仅既有 `TestParseTVAPKMetadataParsesReleaseAPK` 夹具失败；`admin-web` 65 文件 913 用例全绿、`npm run build` 通过。
+- 仍待人工执行：迁移 `0052`/`0053` 未在真实 PostgreSQL 上跑过 up→down→up；`CLOUD_INGEST_TEST_DATABASE_URL` gated 用例需真库。
+
 ## 2026-11-23 16:46 +0800 云下载批量入库：复审与收敛
 - 复审：同一对子代理复核 `5f82ed1`。后端阻塞项全部关闭；前端两个阻塞项关闭，但复审发现我在改 `close-on-click-modal` 时多留了一个引号，弹窗挂载即抛 `InvalidCharacterError`（build 与字符串断言都发现不了）。
 - 修复：修掉多余引号；补 `CloudIngestBatchDialog.spec.js` 用属性名正则真解析模板，拦住这类「引号错位变成伪属性」的问题（同类缺陷此前只在运行时暴露）。

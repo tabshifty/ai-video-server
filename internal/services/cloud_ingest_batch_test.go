@@ -11,13 +11,14 @@ import (
 )
 
 type fakeIngestBatchRepo struct {
-	created     models.CloudIngestBatch
-	createErr   error
-	attachCalls []int64
-	attachTitle []string
-	attachOK    bool
-	awaiting    []int64
-	deleteCalls int
+	created      models.CloudIngestBatch
+	createErr    error
+	attachCalls  []int64
+	attachTitle  []string
+	attachForced []bool
+	attachOK     bool
+	awaiting     []int64
+	deleteCalls  int
 }
 
 func (f *fakeIngestBatchRepo) Create(_ context.Context, batch models.CloudIngestBatch) (models.CloudIngestBatch, error) {
@@ -29,9 +30,10 @@ func (f *fakeIngestBatchRepo) Create(_ context.Context, batch models.CloudIngest
 	return batch, nil
 }
 
-func (f *fakeIngestBatchRepo) AttachTask(_ context.Context, taskID int64, _ uuid.UUID, title string) (bool, error) {
+func (f *fakeIngestBatchRepo) AttachTask(_ context.Context, taskID int64, _ uuid.UUID, title string, forced bool) (bool, error) {
 	f.attachCalls = append(f.attachCalls, taskID)
 	f.attachTitle = append(f.attachTitle, title)
+	f.attachForced = append(f.attachForced, forced)
 	return f.attachOK, nil
 }
 
@@ -247,6 +249,10 @@ func TestSubmitIngestBatchAttachesMembersAndForced(t *testing.T) {
 	}
 	if batchRepo.attachTitle[1] != "旧片" {
 		t.Fatalf("per-link title not forwarded: %v", batchRepo.attachTitle)
+	}
+	// 强制标记必须落在任务行上，列表页才能单行标注。
+	if len(batchRepo.attachForced) != 3 || batchRepo.attachForced[2] != true || batchRepo.attachForced[0] != false {
+		t.Fatalf("forced flags not forwarded: %v", batchRepo.attachForced)
 	}
 	// The completed existing task must auto-import immediately.
 	foundExisting := false

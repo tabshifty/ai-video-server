@@ -167,7 +167,7 @@ func (s *CloudDownloadService) SubmitIngestBatch(ctx context.Context, input mode
 		if !hasTask || taskID == 0 {
 			return
 		}
-		attached, attachErr := s.batchRepo.AttachTask(ctx, taskID, created.ID, titles[index])
+		attached, attachErr := s.batchRepo.AttachTask(ctx, taskID, created.ID, titles[index], forced[index])
 		if attachErr != nil {
 			item.Message = joinIngestMessage(item.Message, "入库批归属失败: "+attachErr.Error())
 			return

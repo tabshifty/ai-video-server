@@ -98,13 +98,14 @@ func (r *CloudIngestBatchRepository) GetByID(ctx context.Context, id uuid.UUID) 
 
 // AttachTask binds a task to a batch unless another batch already claimed it.
 // The bool reports whether this call wrote the binding.
-func (r *CloudIngestBatchRepository) AttachTask(ctx context.Context, taskID int64, batchID uuid.UUID, title string) (bool, error) {
+func (r *CloudIngestBatchRepository) AttachTask(ctx context.Context, taskID int64, batchID uuid.UUID, title string, forced bool) (bool, error) {
 	tag, err := r.pool.Exec(ctx, `
 UPDATE cloud_download_tasks
 SET ingest_batch_id = $2,
     ingest_title = NULLIF($3, ''),
+    ingest_forced = $4,
     updated_at = now()
-WHERE id = $1 AND ingest_batch_id IS NULL`, taskID, batchID, title)
+WHERE id = $1 AND ingest_batch_id IS NULL`, taskID, batchID, title, forced)
 	if err != nil {
 		return false, fmt.Errorf("attach cloud ingest batch: %w", err)
 	}

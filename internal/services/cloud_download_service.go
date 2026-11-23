@@ -69,7 +69,7 @@ type cloudDownloadImportSummaryRepository interface {
 // them. *repository.CloudIngestBatchRepository implements it.
 type cloudIngestBatchRepository interface {
 	Create(ctx context.Context, batch models.CloudIngestBatch) (models.CloudIngestBatch, error)
-	AttachTask(ctx context.Context, taskID int64, batchID uuid.UUID, title string) (bool, error)
+	AttachTask(ctx context.Context, taskID int64, batchID uuid.UUID, title string, forced bool) (bool, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	ListAwaitingAutoImport(ctx context.Context, limit int) ([]int64, error)
 }

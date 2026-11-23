@@ -129,24 +129,75 @@ function resetForm() {
   previewPage.value = 1
 }
 
-async function loadOptions() {
-  const [tags, actors, collections, imageCollections] = await Promise.all([
-    getAdminVideoTags({ page: 1, page_size: 100 }).catch(() => ({ items: [] })),
-    getAdminActors({ page: 1, page_size: 100 }).catch(() => ({ items: [] })),
-    getAdminCollections({ active: 1, page: 1, page_size: 100 }).catch(() => ({ items: [] })),
-    getAdminImageCollections({ active: 1, page: 1, page_size: 100 }).catch(() => ({ items: [] }))
-  ])
-  // /admin/video-tags 返回 {tag, used_count}：读错字段会把 undefined 写成标签。
-  tagOptions.value = (tags.items || [])
-    .map((item) => String(item.tag || item.name || '').trim())
+// 候选一律远程检索：合集/演员/标签都可能超过一页，一次性拉 100 条会选不到。
+function mergeSelected(options, selected, key) {
+  const merged = new Map(options.map((option) => [option.value, option]))
+  for (const value of selected || []) {
+    if (!merged.has(value)) {
+      merged.set(value, { value, label: value })
+    }
+  }
+  return [...merged.values()]
+}
+
+async function fetchTags(keyword = '') {
+  const data = await getAdminVideoTags({ q: keyword, limit: 20 }).catch(() => ({ items: [] }))
+  return (data.items || [])
+    .map((item) => String(item.tag || '').trim())
     .filter(Boolean)
     .map((tag) => ({ value: tag, label: tag }))
-  actorOptions.value = (actors.items || []).map((item) => ({ value: item.name, label: item.name }))
-  collectionOptions.value = (collections.items || []).map((item) => ({ value: item.id, label: item.name }))
-  imageCollectionOptions.value = (imageCollections.items || []).map((item) => ({
-    value: item.id,
-    label: item.name
-  }))
+}
+
+async function fetchActors(keyword = '') {
+  const data = await getAdminActors({ q: keyword, active: 1, page: 1, page_size: 20 }).catch(() => ({ items: [] }))
+  return (data.items || []).filter((item) => item.name).map((item) => ({ value: item.name, label: item.name }))
+}
+
+async function fetchCollections(keyword = '') {
+  const data = await getAdminCollections({ q: keyword, active: 1, page: 1, page_size: 20 }).catch(() => ({ items: [] }))
+  return (data.items || []).map((item) => ({ value: item.id, label: item.name }))
+}
+
+async function fetchImageCollections(keyword = '') {
+  const data = await getAdminImageCollections({
+    q: keyword,
+    active: 1,
+    page: 1,
+    page_size: 20
+  }).catch(() => ({ items: [] }))
+  return (data.items || []).map((item) => ({ value: item.id, label: item.name }))
+}
+
+async function remoteTags(keyword) {
+  tagOptions.value = mergeSelected(await fetchTags(keyword), form.tags)
+}
+
+async function remoteActors(keyword) {
+  actorOptions.value = mergeSelected(await fetchActors(keyword), form.actorNames)
+}
+
+async function remoteCollections(keyword) {
+  collectionOptions.value = mergeSelected(await fetchCollections(keyword), form.collectionIDs)
+}
+
+async function remoteImageCollections(keyword) {
+  imageCollectionOptions.value = mergeSelected(
+    await fetchImageCollections(keyword),
+    form.imageCollectionID ? [form.imageCollectionID] : []
+  )
+}
+
+async function loadOptions() {
+  const [tags, actors, collections, imageCollections] = await Promise.all([
+    fetchTags(''),
+    fetchActors(''),
+    fetchCollections(''),
+    fetchImageCollections('')
+  ])
+  tagOptions.value = tags
+  actorOptions.value = actors
+  collectionOptions.value = collections
+  imageCollectionOptions.value = imageCollections
 }
 
 async function loadStatuses() {
@@ -377,6 +428,8 @@ async function submit() {
             filterable
             allow-create
             default-first-option
+            remote
+            :remote-method="remoteTags"
             aria-label="视频标签"
             placeholder="可选"
           >
@@ -394,6 +447,8 @@ async function submit() {
               v-model="form.collectionIDs"
               multiple
               filterable
+              remote
+              :remote-method="remoteCollections"
               aria-label="所属视频合集"
               placeholder="仅短视频可用"
             >
@@ -414,6 +469,8 @@ async function submit() {
             filterable
             allow-create
             default-first-option
+            remote
+            :remote-method="remoteActors"
             aria-label="关联演员"
             placeholder="可选"
           >
@@ -430,6 +487,8 @@ async function submit() {
             v-model="form.imageCollectionID"
             filterable
             clearable
+            remote
+            :remote-method="remoteImageCollections"
             aria-label="图片图集"
             placeholder="可选，只能选择已有图集"
           >

@@ -160,4 +160,14 @@ describe('115 云下载列表页', () => {
     expect(template).toContain("row.source === 'manual'")
     expect(template).toContain("row.post_title || '原帖已删除'")
   })
+
+  it('支持入库批筛选、入库状态列与强制标记', () => {
+    expect(template).toContain('aria-label="入库批筛选"')
+    expect(script).toContain('ingest_batch_id')
+    expect(template).toContain('label="入库状态"')
+    expect(template).toContain('ingestMeta(row)')
+    expect(template).toContain('row.ingest_forced')
+    // 列表页必须真的 import 派生函数：漏了会在非空列表上运行期崩。
+    expect(script).toContain("import { resolveIngestStatusMeta } from './ed2kIngest.helpers'")
+  })
 })

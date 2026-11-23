@@ -64,6 +64,14 @@ describe('CloudIngestBatchDialog 结构', () => {
     expect(template).toContain('本批将占用')
   })
 
+  it('四类候选都走远程检索，不会因为只拉一页而选不到', () => {
+    for (const method of ['remoteTags', 'remoteActors', 'remoteCollections', 'remoteImageCollections']) {
+      expect(template).toContain(`:remote-method="${method}"`)
+      expect(source).toContain(`function ${method}(`)
+    }
+    expect(template).not.toContain('page_size: 100')
+  })
+
   it('脚本侧使用新的文件名清洗与 payload 构造函数，不误用上传页旧语义', () => {
     expect(source).toContain('buildEd2kIngestPayload')
     expect(source).toContain('validateEd2kIngestForm')
