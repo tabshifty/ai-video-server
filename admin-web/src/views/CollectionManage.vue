@@ -241,8 +241,6 @@ function onCleanupCompleted() {
       <el-skeleton v-if="initialLoading" :rows="8" animated />
 
       <SectionCard v-else-if="!loadError || list.length > 0" dense>
-        <template #title>合集列表</template>
-        <template #description>支持短视频合集的新增、编辑、停用与删除</template>
         <EmptyState
           v-if="list.length === 0"
           :title="hasFilters ? '当前筛选无结果' : '暂无合集'"

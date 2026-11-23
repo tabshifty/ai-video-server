@@ -252,11 +252,6 @@ onMounted(load)
       <el-skeleton v-if="initialLoading" :rows="10" animated />
 
       <SectionCard v-else-if="!loadError || list.length > 0" dense>
-        <template #title>资源列表</template>
-        <template #actions>
-          <el-tag effect="plain">共 {{ total }} 条</el-tag>
-        </template>
-
         <Toolbar dense>
           <template #filters>
             <el-input

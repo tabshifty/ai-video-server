@@ -511,9 +511,6 @@ onBeforeUnmount(() => {
       <el-skeleton v-if="initialLoading" :rows="8" animated />
 
       <SectionCard v-else-if="!loadError || list.length > 0" dense>
-        <template #title>合集列表</template>
-        <template #description>维护图片合集并统一管理图片归档关系。</template>
-
         <EmptyState
           v-if="list.length === 0"
           :title="hasFilters ? '当前筛选无结果' : '暂无图片合集'"

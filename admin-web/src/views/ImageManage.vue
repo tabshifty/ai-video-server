@@ -168,7 +168,8 @@ const activeFilterChips = computed(() => {
 const bulkActions = computed(() => [
   { label: '批量启用', icon: SwitchButton, type: 'primary', loading: bulkOperating.value, disabled: bulkOperating.value, onClick: () => bulkToggleActive(true) },
   { label: '批量停用', icon: SwitchButton, type: 'warning', loading: bulkOperating.value, disabled: bulkOperating.value, onClick: () => bulkToggleActive(false) },
-  { label: '批量删除', icon: Delete, type: 'danger', loading: bulkOperating.value, disabled: bulkOperating.value, onClick: doBulkDelete }
+  { label: '批量删除', icon: Delete, type: 'danger', loading: bulkOperating.value, disabled: bulkOperating.value, onClick: doBulkDelete },
+  { label: '取消选择', disabled: bulkOperating.value, onClick: clearImageSelection }
 ])
 
 function readViewportWidth() {
@@ -1113,11 +1114,6 @@ onBeforeUnmount(() => {
       <el-skeleton v-if="loading && list.length === 0" :rows="12" animated />
 
       <SectionCard v-else-if="!listError || list.length > 0" dense>
-        <template #title>图片资产</template>
-        <template #actions>
-          <el-button v-if="selectedImageRows.length > 0" @click="clearImageSelection">取消选择</el-button>
-        </template>
-
         <EmptyState
           v-if="list.length === 0"
           :title="hasActiveFilters ? '当前筛选无结果' : '暂无图片'"

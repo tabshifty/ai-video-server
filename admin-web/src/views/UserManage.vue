@@ -152,8 +152,6 @@ onMounted(load)
       <el-skeleton v-if="initialLoading" :rows="8" animated />
 
       <SectionCard v-else-if="!loadError || list.length > 0" dense>
-        <template #title>账号列表</template>
-        <template #description>可直接调整用户角色，变更即时生效。</template>
         <EmptyState
           v-if="list.length === 0"
           title="暂无用户"

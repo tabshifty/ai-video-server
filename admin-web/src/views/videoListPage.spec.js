@@ -533,7 +533,7 @@ async function load() {
     expect(template).toContain("hasActiveFilters ? '当前筛选无结果' : '暂无视频'")
     expect(template).toContain("hasActiveFilters ? '清除筛选后查看全部视频' : '上传视频后会显示在这里'")
     expect(template).toContain('@click="resetFilters">清除筛选</el-button>')
-    expect(template).toContain('共 {{ total }} 条')
+    expect(template).toContain('layout="total, prev, pager, next"')
   })
 
   it('详情常驻且低频行操作进入可访问菜单并保留删除确认', () => {

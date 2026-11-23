@@ -1226,3 +1226,9 @@
 - 进度：为表格下方分页补齐 12px 上间距，覆盖右对齐工具栏、视频列表混合工具栏与图片合集抽屉。
 - 影响文件：`admin-web/src/assets/theme.css`、`admin-web/src/views/VideoList.vue`、`admin-web/src/views/ImageCollectionManage.vue`、`CONTEXT.md`、`plan.md`。
 - 验证：`npx vitest run` 通过（62 文件 / 866 用例）；`npm run build` 通过；等待用户确认后再部署。
+
+## 2026-11-23 收口单表列表页信息层级
+
+- 进度：移除视频、图片、演员、合集、用户、任务、论坛、云下载、图片合集、密码库等单表列表页 SectionCard 的重复标题与泛说明；总数统一由分页栏显示，图片批量取消选择并入 BulkActionBar。
+- 影响文件：`admin-web/src/views/{VideoList,ImageManage,ActorManage,CollectionManage,UserManage,TaskMonitor,ForumPostList,CloudDownloadList,ImageCollectionManage,ToolboxPasswordVault}.vue`、`admin-web/src/views/listPageChrome.spec.js`、`admin-web/src/views/videoListPage.spec.js`、`CONTEXT.md`、`plan.md`。
+- 验证：`npx vitest run` 通过（63 文件 / 868 用例）；`npm run build` 通过；等待用户确认后再部署。

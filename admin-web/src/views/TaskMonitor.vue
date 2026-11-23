@@ -276,7 +276,6 @@ onUnmounted(() => {
       <el-skeleton v-if="initialLoading" :rows="12" animated />
 
       <SectionCard v-else-if="!loadError || list.length > 0" dense>
-        <template #title>任务列表</template>
         <EmptyState
           v-if="list.length === 0"
           :title="hasStatusFilter ? '当前筛选无结果' : '暂无任务'"

@@ -1537,10 +1537,6 @@ onBeforeUnmount(() => {
       <el-skeleton v-if="listLoading && list.length === 0" :rows="10" animated />
 
       <SectionCard v-else-if="!listError || list.length > 0" dense>
-        <template #title>视频列表</template>
-        <template #actions>
-          <span class="result-total">共 {{ total }} 条</span>
-        </template>
         <EmptyState
           v-if="list.length === 0"
           :title="hasActiveFilters ? '当前筛选无结果' : '暂无视频'"
@@ -1648,7 +1644,7 @@ onBeforeUnmount(() => {
           <AdminTablePagination
             :current-page="query.page"
             :page-size="query.page_size"
-            layout="prev, pager, next"
+            layout="total, prev, pager, next"
             :total="total"
             @current-change="setPage"
             @size-change="setPageSize"
@@ -2322,11 +2318,6 @@ onBeforeUnmount(() => {
 .column-settings {
   display: grid;
   gap: var(--space-2);
-}
-
-.result-total {
-  color: var(--text-muted);
-  font-size: var(--text-small);
 }
 
 .detail-drawer-form {

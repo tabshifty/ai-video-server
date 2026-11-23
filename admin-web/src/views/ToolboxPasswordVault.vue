@@ -274,9 +274,6 @@ onMounted(loadEntries)
       <PageHeader title="密码管理" subtitle="记录外部服务、网站和设备的账号密码。" />
 
       <SectionCard data-density="compact">
-        <template #title>密码库</template>
-        <template #description>支持新增、修改、删除、显示密码和复制账号密码。</template>
-
         <Toolbar dense>
           <template #filters>
             <el-input

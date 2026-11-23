@@ -391,8 +391,6 @@ onMounted(load)
       <el-skeleton v-if="initialLoading" :rows="8" animated />
 
       <SectionCard v-else-if="!loadError || list.length > 0" dense>
-        <template #title>演员列表</template>
-        <template #description>支持演员资料的新增、编辑、停用与刮削回填</template>
         <EmptyState
           v-if="list.length === 0"
           :title="hasFilters ? '当前筛选无结果' : '暂无演员'"
