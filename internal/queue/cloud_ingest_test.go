@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -124,4 +126,19 @@ func mustMarshalCloudIngestPayload(t *testing.T, payload CloudIngestPayload) []b
 		t.Fatalf("marshal payload: %v", err)
 	}
 	return raw
+}
+
+// 回归护栏：导入曾经错误地复用下载队列，TaskID 与卡住的旧任务冲突后被
+// 静默吞掉，自动入库永远不执行。这里直接检查调用点，避免再次写错字段。
+func TestEnqueueCloudIngestUsesIngestQueue(t *testing.T) {
+	source, err := os.ReadFile("cloud_ingest.go")
+	if err != nil {
+		t.Fatalf("read cloud_ingest.go: %v", err)
+	}
+	if strings.Contains(string(source), "buildCloudIngestTaskOptions(e.cloudQueue") {
+		t.Fatal("EnqueueCloudIngest must not enqueue on the download queue")
+	}
+	if !strings.Contains(string(source), "buildCloudIngestTaskOptions(e.cloudIngestQueue") {
+		t.Fatal("EnqueueCloudIngest must enqueue on the ingest queue")
+	}
 }

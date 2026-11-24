@@ -52,6 +52,7 @@ type Config struct {
 	ArchiveExtractQueue         string
 	CloudDownloadQueue          string
 	CloudIngestQueue            string
+	CloudDownloadConcurrency    int
 	ArchiveExtractWorkers       int
 	TranscodeTaskTimeout        time.Duration
 	TelegramAPIID               int
@@ -122,6 +123,7 @@ func Load() (Config, error) {
 		ArchiveExtractQueue:         getEnv("ARCHIVE_EXTRACT_QUEUE", "archive"),
 		CloudDownloadQueue:          strings.TrimSpace(getEnv("CLOUD_DOWNLOAD_QUEUE", "cloud")),
 		CloudIngestQueue:            strings.TrimSpace(getEnv("CLOUD_INGEST_QUEUE", "cloud-ingest")),
+		CloudDownloadConcurrency:    getIntEnv("CLOUD_DOWNLOAD_CONCURRENCY", 2),
 		ArchiveExtractWorkers:       getIntEnv("ARCHIVE_EXTRACT_WORKERS", 1),
 		MaxTranscodeWorkers:         getIntEnv("MAX_TRANSCODE_WORKERS", 2),
 		TranscodeTaskTimeout:        time.Duration(getIntEnv("TRANSCODE_TASK_TIMEOUT_MINUTES", 360)) * time.Minute,

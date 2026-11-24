@@ -52,7 +52,7 @@ func (e *Enqueuer) EnqueueCloudIngest(importID int64, attempt int, input models.
 	}
 	_, err = e.client.Enqueue(
 		asynq.NewTask(TypeCloudIngest, payload),
-		buildCloudIngestTaskOptions(e.cloudQueue, CloudIngestTaskID(importID, attempt))...,
+		buildCloudIngestTaskOptions(e.cloudIngestQueue, CloudIngestTaskID(importID, attempt))...,
 	)
 	if errors.Is(err, asynq.ErrTaskIDConflict) {
 		return nil

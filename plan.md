@@ -1,5 +1,12 @@
 # plan.md
 
+## 2026-11-24 09:24 +0800 自动入库二次修复：入队队列写错 + 独立下载执行器
+- 真因一：`EnqueueCloudIngest` 仍调用 `buildCloudIngestTaskOptions(e.cloudQueue, …)`（上一轮的替换未生效）。TaskID 与卡在下载队列里的旧任务冲突，`asynq.ErrTaskIDConflict` 被当成"已排队"静默吞掉，于是修复扫描每 2 分钟"成功"一次却什么都没投递。表现为导入记录永远 `queued`、无任何 WARN。
+- 真因二：即使队列对了，asynq 的并发槽位也是全局的。`concurrency=3` 被 3 条最长 6 小时的下载占满时，任何队列都拿不到槽位，队列权重只在槽位释放时才有意义。
+- 修复：`EnqueueCloudIngest` 改用 `e.cloudIngestQueue`；下载任务改由独立的 asynq server 执行（`CLOUD_DOWNLOAD_CONCURRENCY`，默认 2），主 worker 只消费转码/解包/`cloud-ingest`，下载再也占不到主槽位。
+- 护栏：新增源码级回归用例，禁止导入再写回下载队列字段；配置校验强制四个队列名互不相同。
+- 验证：`go build ./...`、`go vet ./...`；`go test ./internal/config ./internal/queue` 通过；部署后确认 `cloud-ingest` 队列出现任务且导入状态推进。
+
 ## 2026-11-24 09:15 +0800 云下载列表筛选排版与自动入库饿死
 - 现象：入库批筛选控件排版歪斜；选中后标签不可读；已完成任务的入库状态长期停在「入库中」。
 - 排版根因：`el-select` 默认宽度 128px，新增的 `.cloud-ingest-filter` 没设宽度，标签被挤断。

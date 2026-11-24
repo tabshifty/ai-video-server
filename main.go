@@ -430,11 +430,11 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	}
 	queueNames := []string{cfg.AsynqQueue, cfg.ArchiveExtractQueue}
 	if cfg.CloudDownloadEnabled {
-		// 下载优先级最低；导入给高权重，这样每次有槽位释放时导入大概率先跑，
-		// 不会因为下载占满并发而永远排队。
-		workerQueues[cfg.CloudDownloadQueue] = 1
+		// 导入走高权重队列，紧跟转码/解包；下载单独起一个 server，
+		// 因为 asynq 的并发槽位是全局的：同 server 里一条最长 6 小时的下载
+		// 会把导入饿死，权重只在槽位释放时才起作用。
 		workerQueues[cfg.CloudIngestQueue] = 30
-		queueNames = append(queueNames, cfg.CloudDownloadQueue, cfg.CloudIngestQueue)
+		queueNames = append(queueNames, cfg.CloudIngestQueue)
 	}
 
 	srv := asynq.NewServer(
@@ -445,6 +445,27 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 		},
 	)
 	logger.Info("worker started", "concurrency", cfg.MaxTranscodeWorkers+cfg.ArchiveExtractWorkers, "queues", queueNames)
+
+	var downloadSrv *asynq.Server
+	if cfg.CloudDownloadEnabled {
+		downloadConcurrency := cfg.CloudDownloadConcurrency
+		if downloadConcurrency < 1 {
+			downloadConcurrency = 1
+		}
+		downloadSrv = asynq.NewServer(
+			redisOpt,
+			asynq.Config{
+				Concurrency: downloadConcurrency,
+				Queues:      map[string]int{cfg.CloudDownloadQueue: 1},
+			},
+		)
+		logger.Info("cloud download server started", "concurrency", downloadConcurrency, "queue", cfg.CloudDownloadQueue)
+		if err := downloadSrv.Start(mux); err != nil {
+			return fmt.Errorf("start cloud download server: %w", err)
+		}
+		defer downloadSrv.Shutdown()
+	}
+
 	if err := srv.Run(mux); err != nil {
 		return fmt.Errorf("run asynq server: %w", err)
 	}
