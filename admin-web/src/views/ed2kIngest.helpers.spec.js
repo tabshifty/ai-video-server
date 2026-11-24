@@ -11,6 +11,9 @@ import {
   cleanEd2kIngestTitle,
   getEd2kFilenameExtension,
   resolveIngestStatusMeta,
+  ingestBatchLabel,
+  ingestBatchSelectedLabel,
+  normalizedIngestBatchID,
   truncateTitle,
   validateEd2kIngestForm
 } from './ed2kIngest.helpers'
@@ -226,5 +229,55 @@ describe('truncateTitle', () => {
   it('按码点截断并补省略号', () => {
     expect(truncateTitle('あ'.repeat(250))).toHaveLength(200)
     expect(truncateTitle('短标题')).toBe('短标题')
+  })
+})
+
+describe('入库批筛选标签', () => {
+  const batch = {
+    id: '43ec49eb-383f-4912-a777-6eb0929a95f8',
+    video_type: 'short',
+    counts: { members: 14 },
+    created_at: '2026-11-24T01:06:07Z'
+  }
+
+  it('选项文案带类型、条数与时间，且不含 UUID', () => {
+    const label = ingestBatchLabel(batch)
+    expect(label).toContain('入库批')
+    expect(label).toContain('短视频')
+    expect(label).toContain('14 条')
+    expect(label).toMatch(/\d\d-\d\d \d\d:\d\d/)
+    expect(label).not.toContain('43ec49eb')
+  })
+
+  it('选中项在任何分支都不会显示 id', () => {
+    // 未选择
+    expect(ingestBatchSelectedLabel('')).toBe('全部入库批')
+    // 选项还没到
+    expect(ingestBatchSelectedLabel(batch.id, [], true)).toBe('入库批（加载中…）')
+    // 选项已到但该批不在列表里（深链、超过条数、接口失败）
+    expect(ingestBatchSelectedLabel(batch.id, [], false)).toBe('入库批（当前批）')
+    // 命中选项
+    const hit = ingestBatchSelectedLabel(batch.id, [batch], false)
+    expect(hit).toContain('短视频')
+    expect(hit).toContain('14 条')
+
+    for (const value of ['', batch.id, 'unknown-id']) {
+      for (const loading of [true, false]) {
+        const text = ingestBatchSelectedLabel(value, [], loading)
+        expect(text).not.toContain('43ec49eb')
+        expect(text).not.toContain('unknown-id')
+        expect(text).toMatch(/[\u4e00-\u9fa5]/)
+      }
+    }
+  })
+
+  it('清空值统一成空串，避免 undefined 让筛选状态漂移', () => {
+    expect(normalizedIngestBatchID(undefined)).toBe('')
+    expect(normalizedIngestBatchID(null)).toBe('')
+    expect(normalizedIngestBatchID(batch.id)).toBe(batch.id)
+  })
+
+  it('占位选项也只用中文', () => {
+    expect(ingestBatchLabel({ id: batch.id, placeholder: true })).toBe('入库批（当前批）')
   })
 })

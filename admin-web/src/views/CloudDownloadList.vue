@@ -37,7 +37,13 @@ import {
 } from './cloudDownloadFileDeletion.helpers'
 import { canConfirmLocalFileDeletion, canDeleteCloudDownloadLocalFile, localFileDeletionSizeLabel } from './cloudDownloadLocalFileDeletion.helpers'
 import { extractApiErrorMessage } from './toolbox.helpers'
-import { resolveIngestStatusMeta } from './ed2kIngest.helpers'
+import {
+  ingestBatchKey,
+  ingestBatchLabel,
+  ingestBatchSelectedLabel,
+  normalizedIngestBatchID,
+  resolveIngestStatusMeta
+} from './ed2kIngest.helpers'
 
 const POLL_INTERVAL_MS = 5000
 const BROWSER_POLL_INTERVAL_MS = 10000
@@ -73,37 +79,6 @@ const query = reactive({ page: 1, page_size: 20, status: '', ingest_batch_id: ''
 const route = useRoute()
 const ingestBatchOptions = ref([])
 const ingestBatchLoading = ref(false)
-const INGEST_VIDEO_TYPE_LABELS = { short: '短视频', movie: '电影', episode: '剧集分集', av: 'AV' }
-
-function ingestBatchKey(batch) {
-  return String(batch?.id || '')
-}
-
-// 选中值一律按字符串处理：el-select 清空时可能给 undefined/null，
-// 一旦混进去，hasStatusFilter 与「全部入库批」选项都会失配。
-function normalizedIngestBatchID(value) {
-  return value == null ? '' : String(value)
-}
-
-function ingestBatchWhen(iso) {
-  const date = iso ? new Date(iso) : null
-  if (!date || Number.isNaN(date.getTime())) {
-    return ''
-  }
-  const pad = (value) => String(value).padStart(2, '0')
-  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-function ingestBatchLabel(batch) {
-  if (batch?.placeholder) {
-    return `入库批 ${ingestBatchKey(batch).slice(0, 8)} · 当前批`
-  }
-  const type = INGEST_VIDEO_TYPE_LABELS[batch?.video_type] || batch?.video_type || ''
-  const members = batch?.counts?.members || 0
-  const when = ingestBatchWhen(batch?.created_at)
-  // 选中的下拉必须能一眼认出是哪一批，所以类型、条数、时间都要在标签里。
-  return ['入库批', type, `${members} 条`, when].filter(Boolean).join(' · ')
-}
 const browserState = ref({})
 const browserStateError = ref('')
 const retryingId = ref(0)
@@ -692,6 +667,9 @@ onMounted(() => {
   if (fromRoute) {
     query.page = 1
   }
+  // 先补占位选项再发请求：否则首帧选项为空，el-select 会把原始值当标签显示。
+  ingestBatchLoading.value = true
+  ensureSelectedIngestBatchOption()
   load()
   loadBrowserState()
   loadIngestBatchOptions()
@@ -792,6 +770,9 @@ onUnmounted(() => {
               @change="applyIngestBatchFilter"
               @visible-change="onIngestBatchDropdown"
             >
+              <template #label>
+                <span class="cloud-ingest-filter__label">{{ ingestBatchSelectedLabel(query.ingest_batch_id) }}</span>
+              </template>
               <el-option label="全部入库批" value="" />
               <el-option
                 v-for="batch in ingestBatchOptions"
@@ -1204,6 +1185,12 @@ onUnmounted(() => {
 /* el-select 默认只有 128px，入库批标签（类型/条数/时间）会被截断。 */
 .cloud-ingest-filter {
   width: min(22rem, 62vw);
+}
+
+.cloud-ingest-filter__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cloud-login-row {

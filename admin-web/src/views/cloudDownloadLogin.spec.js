@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs'
 import { computed, reactive, ref } from 'vue'
 // 用真实实现注入，不要 stub：之前 stub 成 () => null 把一个运行期
 // ReferenceError（列表页忘记 import）完全遮住了。
-import { resolveIngestStatusMeta } from './ed2kIngest.helpers'
+import {
+  ingestBatchKey,
+  ingestBatchLabel,
+  ingestBatchSelectedLabel,
+  normalizedIngestBatchID,
+  resolveIngestStatusMeta
+} from './ed2kIngest.helpers'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Run the page's actual setup/lifecycle with controlled API responses.
@@ -22,6 +28,10 @@ function createPage() {
     useRoute: () => ({ query: {} }),
     watch: () => () => {},
     resolveIngestStatusMeta,
+    normalizedIngestBatchID,
+    ingestBatchKey,
+    ingestBatchLabel,
+    ingestBatchSelectedLabel,
     onMounted: fn => mounted.push(fn), onUnmounted: fn => unmounted.push(fn),
     hasActiveImportTasks: () => false, hasActiveCloudFileDeletions: () => false, ...api
   }

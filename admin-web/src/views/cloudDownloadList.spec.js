@@ -168,6 +168,8 @@ describe('115 云下载列表页', () => {
     expect(template).toContain('ingestMeta(row)')
     expect(template).toContain('row.ingest_forced')
     // 列表页必须真的 import 派生函数：漏了会在非空列表上运行期崩。
-    expect(script).toContain("import { resolveIngestStatusMeta } from './ed2kIngest.helpers'")
+    expect(script).toContain("from './ed2kIngest.helpers'")
+    expect(script).toContain('resolveIngestStatusMeta')
+    expect(script).toContain('ingestBatchSelectedLabel')
   })
 })

@@ -348,3 +348,53 @@ export function resolveIngestStatusMeta(row) {
       return { label: '待自动入库', tone: 'warning' }
   }
 }
+
+export const INGEST_VIDEO_TYPE_LABELS = {
+  short: '短视频',
+  movie: '电影',
+  episode: '剧集分集',
+  av: 'AV'
+}
+
+// 批 id 一律按字符串处理：el-select 清空时可能给 undefined/null。
+export function normalizedIngestBatchID(value) {
+  return value == null ? '' : String(value)
+}
+
+export function ingestBatchKey(batch) {
+  return String(batch?.id || '')
+}
+
+export function ingestBatchWhen(iso) {
+  const date = iso ? new Date(iso) : null
+  if (!date || Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// 下拉选项文案。批详情未知时也只给中文占位，绝不把 UUID 露出来。
+export function ingestBatchLabel(batch) {
+  if (batch?.placeholder) {
+    return '入库批（当前批）'
+  }
+  const type = INGEST_VIDEO_TYPE_LABELS[batch?.video_type] || batch?.video_type || ''
+  const members = batch?.counts?.members || 0
+  const when = ingestBatchWhen(batch?.created_at)
+  return ['入库批', type, `${members} 条`, when].filter(Boolean).join(' · ')
+}
+
+// 选中项显示文案：从批量入库跳转过来时，选项可能还没到、或该批不在最近若干条里。
+// 这里保证任何分支都返回中文，永远不回退成 id。
+export function ingestBatchSelectedLabel(value, options = [], loading = false) {
+  const selected = normalizedIngestBatchID(value)
+  if (!selected) {
+    return '全部入库批'
+  }
+  const found = (options || []).find((batch) => ingestBatchKey(batch) === selected)
+  if (found) {
+    return ingestBatchLabel(found)
+  }
+  return loading ? '入库批（加载中…）' : '入库批（当前批）'
+}
