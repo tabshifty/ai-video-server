@@ -101,6 +101,25 @@ func (r *CloudDownloadImportRepository) GetByTaskID(ctx context.Context, taskID 
 }
 
 // UpdateProgress records a non-terminal status transition and its error.
+// MarkFailedIfActive marks an import failed only while it is still in a
+// non-terminal state. A read-then-write guard cannot prevent this: a concurrent
+// success can commit between the read and the write and be silently clobbered
+// (observed in production: an imported row was flipped back to failed because
+// the source file had already been consumed by the winning attempt).
+func (r *CloudDownloadImportRepository) MarkFailedIfActive(ctx context.Context, id int64, errorMessage string) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+UPDATE cloud_download_imports SET
+    status = $2,
+    error_message = NULLIF($3, '')
+WHERE id = $1
+  AND status IN ('queued', 'hashing', 'copying', 'creating')`,
+		id, models.CloudImportFailed, errorMessage)
+	if err != nil {
+		return false, fmt.Errorf("mark cloud download import failed: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 func (r *CloudDownloadImportRepository) UpdateProgress(ctx context.Context, id int64, status, errorMessage string) error {
 	_, err := r.pool.Exec(ctx, `
 UPDATE cloud_download_imports SET

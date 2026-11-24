@@ -97,3 +97,60 @@ CREATE TEMP TABLE cloud_ingest_batches (
 		t.Fatal("deleted batch should not be readable")
 	}
 }
+
+// 生产事故回归（真库）：失败写入必须是条件更新，不能覆盖已成功的导入。
+func TestMarkFailedIfActiveDoesNotClobberImported(t *testing.T) {
+	dsn := os.Getenv("CLOUD_INGEST_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("设置 CLOUD_INGEST_TEST_DATABASE_URL 后验证真实 PostgreSQL 条件更新")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.MaxConns = 1
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	if _, err := pool.Exec(ctx, `
+CREATE TEMP TABLE cloud_download_imports (
+    id            BIGSERIAL PRIMARY KEY,
+    task_id       BIGINT NOT NULL UNIQUE,
+    kind          TEXT NOT NULL DEFAULT 'video',
+    status        TEXT NOT NULL,
+    error_message TEXT
+);
+INSERT INTO cloud_download_imports (task_id, status) VALUES (1, 'imported'), (2, 'copying');`); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := NewCloudDownloadImportRepository(pool)
+
+	changed, err := repo.MarkFailedIfActive(ctx, 1, "文件缺失")
+	if err != nil {
+		t.Fatalf("mark imported row: %v", err)
+	}
+	if changed {
+		t.Fatal("must not flip an imported import to failed")
+	}
+	var status string
+	if err := pool.QueryRow(ctx, `SELECT status FROM cloud_download_imports WHERE task_id = 1`).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != "imported" {
+		t.Fatalf("status = %q, want imported", status)
+	}
+
+	changed, err = repo.MarkFailedIfActive(ctx, 2, "文件缺失")
+	if err != nil {
+		t.Fatalf("mark active row: %v", err)
+	}
+	if !changed {
+		t.Fatal("an active import must be marked failed")
+	}
+}

@@ -1,5 +1,14 @@
 # plan.md
 
+## 2026-11-24 17:45 +0800 修复：导入成功被并发失败写入覆盖
+- 现象：一条已入库（视频 ready、有 video_id、有 imported_at）的导入记录 `status=failed`，列表显示入库失败。
+- 根因：`recordAutoImportFailure` 是"先读状态、再写失败"的两步。成功那次在 `Process` 里消费掉源文件后 `Finish(imported)`；与此同时修复扫描仍在跑，`Create` 拿不到文件 → 报文件缺失 → 按读到的旧状态（copying/queued）判定非终态 → 无条件 `UpdateProgress(failed)` 覆盖了刚提交的成功。`MarkFailed` 与 `failImport` 同样是先读后写。
+- 修复：新增 `MarkFailedIfActive`，用一条带 `status IN ('queued','hashing','copying','creating')` 的 UPDATE 做条件写；`recordAutoImportFailure`、`MarkFailed`、`failImport` 全部改用它。无记录时才插入 failed。
+- 测试：两条服务级用例（已 imported 不被覆盖 / 进行中仍会置失败）+ 一条 gated 真库用例（条件更新的原子语义）。
+- 顺带：日志调用改为 nil-safe（测试构造的服务没有 logger）。
+- 验证：`go build ./...`、`go vet ./...`；`go test ./internal/services ./internal/handlers ./internal/repository ./internal/queue ./internal/config` 仅既有 `TestParseTVAPKMetadataParsesReleaseAPK` 失败。
+- 数据修复：部署后把生产上那条被误写的记录改回 `imported`（video_id 与 imported_at 均已存在）。
+
 ## 2026-11-24 09:31 +0800 入库批筛选：选中态永远显示中文（未部署）
 - 现象：从批量入库跳到云下载列表后，入库批筛选选中时显示 UUID，有时空白。
 - 根因：选项标签原先拼了 `id.slice(0,8)`；且选项是异步加载的，首帧没有匹配项时 `el-select` 会直接把原始值当文本渲染；深链的批不在最近若干条里时同样回退成 id。

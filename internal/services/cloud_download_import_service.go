@@ -27,6 +27,7 @@ type cloudDownloadImportRepository interface {
 	GetByID(ctx context.Context, id int64) (models.CloudDownloadImport, error)
 	GetByTaskID(ctx context.Context, taskID int64) (models.CloudDownloadImport, error)
 	UpdateProgress(ctx context.Context, id int64, status, errorMessage string) error
+	MarkFailedIfActive(ctx context.Context, id int64, errorMessage string) (bool, error)
 	SetHash(ctx context.Context, id int64, sha256 string) error
 	SetVideo(ctx context.Context, id int64, videoID uuid.UUID) error
 	SetArchiveBatch(ctx context.Context, id int64, batchID uuid.UUID) error
@@ -529,7 +530,7 @@ func (s *CloudDownloadImportService) resumeVideoImport(
 			// source-original is now an orphan, but never the playback path.
 			if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
 				if s.logger != nil {
-					s.logger.Warn("remove orphan cloud import source failed", "video_id", videoID, "path", targetPath, "error", err)
+					s.logWarn("remove orphan cloud import source failed", "video_id", videoID, "path", targetPath, "error", err)
 				}
 			}
 		}
@@ -678,7 +679,7 @@ func (s *CloudDownloadImportService) failImport(ctx context.Context, id int64, m
 	message = truncateMessage(strings.TrimSpace(message), 800)
 	writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
-	if err := s.repo.UpdateProgress(writeCtx, id, models.CloudImportFailed, message); err != nil {
+	if _, err := s.repo.MarkFailedIfActive(writeCtx, id, message); err != nil {
 		return err
 	}
 	return errors.New(message)
@@ -701,7 +702,8 @@ func (s *CloudDownloadImportService) MarkFailed(ctx context.Context, importID in
 	if models.CloudImportTerminal(record.Status) {
 		return nil
 	}
-	return s.repo.UpdateProgress(ctx, importID, models.CloudImportFailed, truncateMessage(message, 800))
+	_, err = s.repo.MarkFailedIfActive(ctx, importID, truncateMessage(message, 800))
+	return err
 }
 
 func (s *CloudDownloadImportService) loadCompletedTask(ctx context.Context, taskID int64) (models.CloudDownloadTask, error) {
@@ -736,7 +738,7 @@ func (s *CloudDownloadImportService) removeDownloadedSource(sourcePath string) {
 	}
 	if err := os.Remove(sourcePath); err != nil && !os.IsNotExist(err) {
 		if s.logger != nil {
-			s.logger.Warn("remove imported cloud download source failed", "path", sourcePath, "error", err)
+			s.logWarn("remove imported cloud download source failed", "path", sourcePath, "error", err)
 		}
 	}
 }
@@ -933,6 +935,20 @@ func archivePreviewMIME(name, detectedMIME string) string {
 	return archiveMIMEForFormat(format)
 }
 
+// logWarn / logError keep the service usable in tests that build it without a
+// logger; production always injects one.
+func (s *CloudDownloadImportService) logWarn(msg string, args ...any) {
+	if s.logger != nil {
+		s.logger.Warn(msg, args...)
+	}
+}
+
+func (s *CloudDownloadImportService) logError(msg string, args ...any) {
+	if s.logger != nil {
+		s.logger.Error(msg, args...)
+	}
+}
+
 // AutoImportFromBatch runs the batch preset for one completed member task. It
 // exists so the download worker can fulfil a 批量入库 promise without a second
 // admin action. Permanent rejections are recorded as a failed import (so the
@@ -985,23 +1001,28 @@ func (s *CloudDownloadImportService) AutoImportFromBatch(ctx context.Context, ta
 // be imported is visible in the task list instead of being retried forever.
 func (s *CloudDownloadImportService) recordAutoImportFailure(ctx context.Context, taskID int64, cause error) {
 	message := truncateMessage(cause.Error(), 800)
-	record, created, err := s.repo.CreateOrGet(ctx, models.CloudDownloadImport{
-		TaskID:       taskID,
-		Kind:         models.CloudImportKindVideo,
-		Status:       models.CloudImportFailed,
-		ErrorMessage: message,
-	})
-	if err != nil {
-		s.logger.Error("record auto import failure", "task_id", taskID, "error", err)
-		return
-	}
-	// CreateOrGet never overwrites an existing row, so a record already sitting
-	// in a non-terminal state would keep the repair scan re-picking it forever.
-	if !created && !models.CloudImportTerminal(record.Status) {
-		if updateErr := s.repo.UpdateProgress(ctx, record.ID, models.CloudImportFailed, message); updateErr != nil {
-			s.logger.Error("mark auto import failed", "task_id", taskID, "error", updateErr)
+	record, err := s.repo.GetByTaskID(ctx, taskID)
+	switch {
+	case err == nil:
+		// 条件更新：只有仍在进行中的记录才会被改成失败。并发的成功导入
+		// 会把源文件消费掉，随后的探测必然失败——但那不是失败，不能覆盖 imported。
+		if _, markErr := s.repo.MarkFailedIfActive(ctx, record.ID, message); markErr != nil {
+			s.logError("mark auto import failed", "task_id", taskID, "error", markErr)
 			return
 		}
+	case errors.Is(err, pgx.ErrNoRows):
+		if _, _, createErr := s.repo.CreateOrGet(ctx, models.CloudDownloadImport{
+			TaskID:       taskID,
+			Kind:         models.CloudImportKindVideo,
+			Status:       models.CloudImportFailed,
+			ErrorMessage: message,
+		}); createErr != nil {
+			s.logError("record auto import failure", "task_id", taskID, "error", createErr)
+			return
+		}
+	default:
+		s.logError("record auto import failure", "task_id", taskID, "error", err)
+		return
 	}
-	s.logger.Warn("auto import rejected", "task_id", taskID, "reason", cause)
+	s.logWarn("auto import rejected", "task_id", taskID, "reason", cause)
 }

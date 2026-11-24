@@ -44,6 +44,7 @@ type fakeCloudImportRepo struct {
 	createErr    error
 	getErr       error
 	updateErr    error
+	markedFailed int
 	finishErr    error
 	resetErr     error
 	resetWon     bool
@@ -89,6 +90,22 @@ func (f *fakeCloudImportRepo) GetByTaskID(context.Context, int64) (models.CloudD
 		return models.CloudDownloadImport{}, pgx.ErrNoRows
 	}
 	return f.record, nil
+}
+
+func (f *fakeCloudImportRepo) MarkFailedIfActive(_ context.Context, id int64, message string) (bool, error) {
+	if f.updateErr != nil {
+		return false, f.updateErr
+	}
+	if models.CloudImportTerminal(f.record.Status) {
+		return false, nil
+	}
+	f.markedFailed++
+	f.statuses = append(f.statuses, models.CloudImportFailed)
+	f.messages = append(f.messages, message)
+	f.record.Status = models.CloudImportFailed
+	f.record.ErrorMessage = message
+	_ = id
+	return true, nil
 }
 
 func (f *fakeCloudImportRepo) UpdateProgress(_ context.Context, _ int64, status, message string) error {
@@ -1335,5 +1352,46 @@ func TestCloudImportGetTaskHandlesMissingAndReadErrors(t *testing.T) {
 	h.tasks.err = pgx.ErrNoRows
 	if _, err = h.svc.GetImportTask(context.Background(), h.tasks.task.ID); !errors.Is(err, models.ErrCloudDownloadNotFound) {
 		t.Fatalf("任务不存在: %v", err)
+	}
+}
+
+// 生产事故回归：成功导入后源文件被消费，并发的探测必然报"文件缺失"。
+// 失败写入必须是条件更新，不能把已经 imported 的记录翻回 failed。
+func TestAutoImportFailureDoesNotClobberImportedRecord(t *testing.T) {
+	t.Parallel()
+
+	h := newCloudImportHarness(t)
+	h.repo.record = models.CloudDownloadImport{
+		ID:     9,
+		TaskID: 7,
+		Kind:   models.CloudImportKindVideo,
+		Status: models.CloudImportImported,
+	}
+
+	h.svc.recordAutoImportFailure(context.Background(), 7, models.ErrCloudImportFileMissing)
+
+	if h.repo.record.Status != models.CloudImportImported {
+		t.Fatalf("status = %s, want imported (must not be overwritten)", h.repo.record.Status)
+	}
+	if h.repo.markedFailed != 0 {
+		t.Fatalf("markedFailed = %d, want 0 for an already imported record", h.repo.markedFailed)
+	}
+}
+
+func TestAutoImportFailureMarksActiveRecordFailed(t *testing.T) {
+	t.Parallel()
+
+	h := newCloudImportHarness(t)
+	h.repo.record = models.CloudDownloadImport{
+		ID:     9,
+		TaskID: 7,
+		Kind:   models.CloudImportKindVideo,
+		Status: models.CloudImportCopying,
+	}
+
+	h.svc.recordAutoImportFailure(context.Background(), 7, models.ErrCloudImportFileMissing)
+
+	if h.repo.record.Status != models.CloudImportFailed {
+		t.Fatalf("status = %s, want failed", h.repo.record.Status)
 	}
 }
