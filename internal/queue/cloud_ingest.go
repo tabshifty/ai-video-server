@@ -38,8 +38,9 @@ func CloudIngestTaskID(importID int64, attempt int) string {
 	return fmt.Sprintf("cloud:ingest:%d:%d", importID, attempt)
 }
 
-// EnqueueCloudIngest schedules an explicit import on the dedicated cloud
-// queue. Downloads and imports share the low-weight queue.
+// EnqueueCloudIngest schedules an explicit import on the dedicated ingest
+// queue. It deliberately does not share the download queue: worker concurrency
+// is global, and one six-hour download would otherwise starve every import.
 func (e *Enqueuer) EnqueueCloudIngest(importID int64, attempt int, input models.CloudDownloadImportInput) error {
 	payload, err := json.Marshal(CloudIngestPayload{
 		ImportID: importID,

@@ -31,12 +31,12 @@ func TestCloudIngestTaskIDIncludesAttempt(t *testing.T) {
 	}
 }
 
-func TestBuildCloudIngestTaskOptionsUsesCloudQueue(t *testing.T) {
+func TestBuildCloudIngestTaskOptionsUsesGivenQueue(t *testing.T) {
 	t.Parallel()
 
-	opts := buildCloudIngestTaskOptions("cloud", "cloud:ingest:9:1")
+	opts := buildCloudIngestTaskOptions("cloud-ingest", "cloud:ingest:9:1")
 
-	assertOption(t, opts, asynq.QueueOpt, "cloud")
+	assertOption(t, opts, asynq.QueueOpt, "cloud-ingest")
 	assertOption(t, opts, asynq.TaskIDOpt, "cloud:ingest:9:1")
 	assertOption(t, opts, asynq.MaxRetryOpt, 2)
 	assertOption(t, opts, asynq.TimeoutOpt, 2*time.Hour)

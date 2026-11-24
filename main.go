@@ -205,7 +205,7 @@ func configureContentTranslation(scrapeSvc contentTranslationConfigurer, cfg con
 }
 
 func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepository, transSvc *services.TranscodeService, logger *slog.Logger) error {
-	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.CloudDownloadQueue, cfg.TranscodeTaskTimeout)
+	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.CloudDownloadQueue, cfg.CloudIngestQueue, cfg.TranscodeTaskTimeout)
 	defer enqueuer.Close()
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     cfg.RedisAddr,
@@ -366,7 +366,7 @@ func runServer(cfg config.Config, pool *pgxpool.Pool, repo *repository.VideoRepo
 
 func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *services.TranscodeService, logger *slog.Logger) error {
 	mux := asynq.NewServeMux()
-	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.CloudDownloadQueue, cfg.TranscodeTaskTimeout)
+	enqueuer := queue.NewEnqueuer(cfg.RedisAddr, cfg.RedisPassword, cfg.AsynqQueue, cfg.CloudDownloadQueue, cfg.CloudIngestQueue, cfg.TranscodeTaskTimeout)
 	defer enqueuer.Close()
 	scrapeSvc := services.NewScraperService(repo, cfg.TMDBAPIKey, cfg.TMDBBaseURL, cfg.StorageRoot, cfg.PosterStoragePath, cfg.TMDBTimeout)
 	configureAVScraper(scrapeSvc, cfg)
@@ -430,8 +430,11 @@ func runWorker(cfg config.Config, repo *repository.VideoRepository, transSvc *se
 	}
 	queueNames := []string{cfg.AsynqQueue, cfg.ArchiveExtractQueue}
 	if cfg.CloudDownloadEnabled {
+		// 下载优先级最低；导入给高权重，这样每次有槽位释放时导入大概率先跑，
+		// 不会因为下载占满并发而永远排队。
 		workerQueues[cfg.CloudDownloadQueue] = 1
-		queueNames = append(queueNames, cfg.CloudDownloadQueue)
+		workerQueues[cfg.CloudIngestQueue] = 30
+		queueNames = append(queueNames, cfg.CloudDownloadQueue, cfg.CloudIngestQueue)
 	}
 
 	srv := asynq.NewServer(

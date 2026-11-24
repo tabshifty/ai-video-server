@@ -75,3 +75,29 @@ func TestLoadCloudDownloadAcceptsValidEndpoint(t *testing.T) {
 		t.Fatalf("CloudBrowserCDP = %q", cfg.CloudBrowserCDP)
 	}
 }
+
+func TestLoadCloudIngestQueueRejectsDownloadCollision(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("CLOUD_INGEST_QUEUE", "cloud")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "CLOUD_INGEST_QUEUE") {
+		t.Fatalf("error = %v, want CLOUD_INGEST_QUEUE collision error", err)
+	}
+}
+
+func TestLoadCloudIngestQueueDefaultsToDedicatedQueue(t *testing.T) {
+	setRequiredEnv(t)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	// 导入不能和下载同队列：worker 并发是全局的，下载会把导入饿死。
+	if cfg.CloudIngestQueue == cfg.CloudDownloadQueue {
+		t.Fatalf("ingest queue must differ from download queue, both %q", cfg.CloudIngestQueue)
+	}
+	if cfg.CloudIngestQueue != "cloud-ingest" {
+		t.Fatalf("CloudIngestQueue = %q, want cloud-ingest", cfg.CloudIngestQueue)
+	}
+}

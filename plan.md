@@ -1,5 +1,14 @@
 # plan.md
 
+## 2026-11-24 09:15 +0800 云下载列表筛选排版与自动入库饿死
+- 现象：入库批筛选控件排版歪斜；选中后标签不可读；已完成任务的入库状态长期停在「入库中」。
+- 排版根因：`el-select` 默认宽度 128px，新增的 `.cloud-ingest-filter` 没设宽度，标签被挤断。
+- 选中态根因：选项标签是裸 UUID 片段，且清空时 `el-select` 可能写入 `undefined`，导致 `hasStatusFilter` 与「全部入库批」失配；深链进来的批不在最近 50 条选项里时会显示裸 UUID。
+- 修复（前端）：入库批筛选给足宽度（`min(22rem, 62vw)`，窄屏 100%）；标签改为「入库批 · 类型 · N 条 · MM-DD HH:mm」；`:value-on-clear="''"` + 统一字符串化；选中项不在选项里时补占位项；下拉展开时刷新选项。
+- 饿死根因（后端）：worker 并发 3 是全局槽位，3 条下载任务各可跑 6 小时，`cloud:ingest` 与下载同队列 → 导入永远排队。实测 `cloud` active 全为 `cloud:download`，`cloud:ingest` 两条停在 pending。
+- 修复（后端）：新增 `CLOUD_INGEST_QUEUE`（默认 `cloud-ingest`，权重 30），`cloud:ingest` 不再复用下载队列；配置校验强制四个队列名互不相同；修复扫描的「卡住」阈值从 30 分钟收紧到 10 分钟（重复投递幂等）。
+- 验证：`go build ./...`、`go vet ./...`；`go test ./internal/config ./internal/queue` 通过；`admin-web` 913 用例与 `npm run build` 通过。
+
 ## 2026-11-23 17:19 +0800 云下载批量入库：补齐已知遗留
 - 迁移 `0053`：`cloud_download_tasks.ingest_forced`（NOT NULL DEFAULT false），把「强制放行」从只在响应里出现的标签落到任务行；`AttachTask` 在同一条件更新里写入，列表页据此单行标注「强制」。
 - 管理端：入库弹窗的四类候选（标签/演员/视频合集/图片图集）全部改为远程检索（`remote-method` + `q`/`limit`），不再一次性拉 100 条导致超量选不到；已选项在远端结果里合并保留。

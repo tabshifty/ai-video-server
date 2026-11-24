@@ -25,7 +25,7 @@ func NewCloudIngestBatchRepository(pool *pgxpool.Pool) *CloudIngestBatchReposito
 
 // staleImportAfter is how long a non-terminal import may sit untouched before
 // the repair scan re-enqueues it.
-const staleImportAfter = "30 minutes"
+const staleImportAfter = "10 minutes"
 
 const cloudIngestBatchColumns = `
     id,

@@ -72,6 +72,38 @@ const loadError = ref('')
 const query = reactive({ page: 1, page_size: 20, status: '', ingest_batch_id: '' })
 const route = useRoute()
 const ingestBatchOptions = ref([])
+const ingestBatchLoading = ref(false)
+const INGEST_VIDEO_TYPE_LABELS = { short: '短视频', movie: '电影', episode: '剧集分集', av: 'AV' }
+
+function ingestBatchKey(batch) {
+  return String(batch?.id || '')
+}
+
+// 选中值一律按字符串处理：el-select 清空时可能给 undefined/null，
+// 一旦混进去，hasStatusFilter 与「全部入库批」选项都会失配。
+function normalizedIngestBatchID(value) {
+  return value == null ? '' : String(value)
+}
+
+function ingestBatchWhen(iso) {
+  const date = iso ? new Date(iso) : null
+  if (!date || Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function ingestBatchLabel(batch) {
+  if (batch?.placeholder) {
+    return `入库批 ${ingestBatchKey(batch).slice(0, 8)} · 当前批`
+  }
+  const type = INGEST_VIDEO_TYPE_LABELS[batch?.video_type] || batch?.video_type || ''
+  const members = batch?.counts?.members || 0
+  const when = ingestBatchWhen(batch?.created_at)
+  // 选中的下拉必须能一眼认出是哪一批，所以类型、条数、时间都要在标签里。
+  return ['入库批', type, `${members} 条`, when].filter(Boolean).join(' · ')
+}
 const browserState = ref({})
 const browserStateError = ref('')
 const retryingId = ref(0)
@@ -111,7 +143,9 @@ const hasActiveTasks = computed(() => list.value.some((task) => ACTIVE_STATUSES.
 const hasActiveImport = computed(() => hasActiveImportTasks(list.value))
 const hasActiveFileDeletion = computed(() => hasActiveCloudFileDeletions(list.value))
 const shouldPoll = computed(() => hasActiveTasks.value || hasActiveImport.value || hasActiveFileDeletion.value)
-const hasStatusFilter = computed(() => query.status !== '' || query.ingest_batch_id !== '')
+const hasStatusFilter = computed(
+  () => query.status !== '' || normalizedIngestBatchID(query.ingest_batch_id) !== ''
+)
 const refreshIndicatorLabel = computed(() => {
   if (backgroundRefreshing.value) return '正在刷新'
   if (hasActiveFileDeletion.value) return '云盘清理中，每 5 秒自动刷新'
@@ -232,13 +266,49 @@ function ingestMeta(row) {
   return resolveIngestStatusMeta(row)
 }
 
+// 选中值可能不在最近 50 条里（深链、或选项请求失败），补一条占位选项，
+// 否则控件会把裸 UUID 当文本显示出来。
+function ensureSelectedIngestBatchOption() {
+  const selected = normalizedIngestBatchID(query.ingest_batch_id)
+  if (!selected) {
+    return
+  }
+  if (ingestBatchOptions.value.some((batch) => ingestBatchKey(batch) === selected)) {
+    return
+  }
+  ingestBatchOptions.value = [
+    ...ingestBatchOptions.value,
+    { id: selected, counts: { members: 0 }, placeholder: true }
+  ]
+}
+
 async function loadIngestBatchOptions() {
+  if (ingestBatchLoading.value) {
+    return
+  }
+  ingestBatchLoading.value = true
   try {
     const data = await listCloudIngestBatches({ limit: 50 })
     ingestBatchOptions.value = Array.isArray(data?.items) ? data.items : []
   } catch {
     // Filter options are advisory; the task list must still work without them.
     ingestBatchOptions.value = []
+  } finally {
+    ingestBatchLoading.value = false
+    ensureSelectedIngestBatchOption()
+  }
+}
+
+function applyIngestBatchFilter(value) {
+  query.ingest_batch_id = normalizedIngestBatchID(value)
+  ensureSelectedIngestBatchOption()
+  applyStatusFilter()
+}
+
+function onIngestBatchDropdown(visible) {
+  // 每次展开都刷新：工具箱那边可能刚建了新批。
+  if (visible) {
+    loadIngestBatchOptions()
   }
 }
 
@@ -248,7 +318,7 @@ function applyRouteBatchQuery() {
     ? route.query.ingest_batch_id[0]
     : route.query.ingest_batch_id
   const id = typeof raw === 'string' ? raw.trim() : ''
-  if (id === query.ingest_batch_id) {
+  if (id === normalizedIngestBatchID(query.ingest_batch_id)) {
     return false
   }
   // 地址栏移除筛选（例如点了侧边栏同名入口）时必须同步清空，否则列表仍被旧批过滤。
@@ -717,14 +787,17 @@ onUnmounted(() => {
               placeholder="入库批筛选"
               clearable
               filterable
-              @change="applyStatusFilter"
+              :loading="ingestBatchLoading"
+              :value-on-clear="''"
+              @change="applyIngestBatchFilter"
+              @visible-change="onIngestBatchDropdown"
             >
               <el-option label="全部入库批" value="" />
               <el-option
                 v-for="batch in ingestBatchOptions"
-                :key="batch.id"
-                :label="`入库批 ${String(batch.id).slice(0, 8)} · ${batch.counts?.members || 0} 条`"
-                :value="batch.id"
+                :key="ingestBatchKey(batch)"
+                :label="ingestBatchLabel(batch)"
+                :value="ingestBatchKey(batch)"
               />
             </el-select>
           </template>
@@ -1128,6 +1201,11 @@ onUnmounted(() => {
   width: min(14rem, 60vw);
 }
 
+/* el-select 默认只有 128px，入库批标签（类型/条数/时间）会被截断。 */
+.cloud-ingest-filter {
+  width: min(22rem, 62vw);
+}
+
 .cloud-login-row {
   display: flex;
   align-items: center;
@@ -1285,7 +1363,8 @@ onUnmounted(() => {
     min-height: 44px;
   }
 
-  .cloud-status-filter {
+  .cloud-status-filter,
+  .cloud-ingest-filter {
     width: 100%;
     max-width: 20rem;
   }

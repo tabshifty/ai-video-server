@@ -51,6 +51,7 @@ type Config struct {
 	AsynqQueue                  string
 	ArchiveExtractQueue         string
 	CloudDownloadQueue          string
+	CloudIngestQueue            string
 	ArchiveExtractWorkers       int
 	TranscodeTaskTimeout        time.Duration
 	TelegramAPIID               int
@@ -120,6 +121,7 @@ func Load() (Config, error) {
 		AsynqQueue:                  getEnv("ASYNQ_QUEUE", "transcode"),
 		ArchiveExtractQueue:         getEnv("ARCHIVE_EXTRACT_QUEUE", "archive"),
 		CloudDownloadQueue:          strings.TrimSpace(getEnv("CLOUD_DOWNLOAD_QUEUE", "cloud")),
+		CloudIngestQueue:            strings.TrimSpace(getEnv("CLOUD_INGEST_QUEUE", "cloud-ingest")),
 		ArchiveExtractWorkers:       getIntEnv("ARCHIVE_EXTRACT_WORKERS", 1),
 		MaxTranscodeWorkers:         getIntEnv("MAX_TRANSCODE_WORKERS", 2),
 		TranscodeTaskTimeout:        time.Duration(getIntEnv("TRANSCODE_TASK_TIMEOUT_MINUTES", 360)) * time.Minute,
@@ -225,6 +227,20 @@ func validateQueues(cfg Config) error {
 	if cloudQueue == strings.TrimSpace(cfg.AsynqQueue) ||
 		cloudQueue == strings.TrimSpace(cfg.ArchiveExtractQueue) {
 		return fmt.Errorf("CLOUD_DOWNLOAD_QUEUE must differ from ASYNQ_QUEUE and ARCHIVE_EXTRACT_QUEUE")
+	}
+	// 导入任务必须独立于下载队列：worker 并发是全局的，一条 6 小时的下载会占满
+	// 槽位，把同一队列里的导入饿死。
+	ingestQueue := strings.TrimSpace(cfg.CloudIngestQueue)
+	if ingestQueue == "" {
+		return fmt.Errorf("CLOUD_INGEST_QUEUE is required")
+	}
+	if !queueNamePattern.MatchString(ingestQueue) {
+		return fmt.Errorf("CLOUD_INGEST_QUEUE must contain only letters, digits, underscores or dashes")
+	}
+	if ingestQueue == cloudQueue ||
+		ingestQueue == strings.TrimSpace(cfg.AsynqQueue) ||
+		ingestQueue == strings.TrimSpace(cfg.ArchiveExtractQueue) {
+		return fmt.Errorf("CLOUD_INGEST_QUEUE must differ from ASYNQ_QUEUE, ARCHIVE_EXTRACT_QUEUE and CLOUD_DOWNLOAD_QUEUE")
 	}
 	return nil
 }
